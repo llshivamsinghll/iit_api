@@ -1,0 +1,33 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Resume {
+  id             String   @id @default(uuid())
+  name           String
+  email          String
+  phone          String
+  technicalSkills String[]
+  softSkills     String[]
+  experience     String[]
+  education      String[]
+  projects       String[]
+  createdAt      DateTime @default(now())
+}
+
+model JobDescription {
+  id                    String   @id @default(uuid())
+  title                 String
+  company               String
+  requiredSkills        String[]
+  preferredSkills       String[]
+  experienceRequirements String
+  educationRequirements  String
+  responsibilities       String[]
+  createdAt             DateTime @default(now())
+}
