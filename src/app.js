@@ -11,7 +11,10 @@ const app = express();
 
 
 app.use(cors({
-  origin: 'http://localhost:5173' // Your frontend URL
+  origin: ['http://localhost:5173', 'https://yourappdomain.com'], // Add your production domain
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: false
 }));
 app.use(express.json());
 

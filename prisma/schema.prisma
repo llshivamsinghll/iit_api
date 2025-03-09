@@ -18,16 +18,35 @@ model Resume {
   education      String[]
   projects       String[]
   createdAt      DateTime @default(now())
+
+  Leaderboard    Leaderboard[] // One resume can be ranked in multiple leaderboards
 }
 
 model JobDescription {
-  id                    String   @id @default(uuid())
-  title                 String
-  company               String
-  requiredSkills        String[]
-  preferredSkills       String[]
-  experienceRequirements String
-  educationRequirements  String
-  responsibilities       String[]
-  createdAt             DateTime @default(now())
+  id                      String   @id @default(uuid())
+  title                   String
+  company                 String
+  requiredSkills          String[]
+  preferredSkills         String[]
+  experienceRequirements  String
+  educationRequirements   String
+  responsibilities        String[]
+  skills_weight           Float   @default(0.35)
+  education_weight        Float   @default(0.30)
+  experience_weight       Float   @default(0.25)
+  projects_weight         Float   @default(0.10)
+  createdAt               DateTime @default(now())
+
+  Leaderboard             Leaderboard[] // One job can have multiple ranked resumes
+}
+
+model Leaderboard {
+  id        String   @id @default(uuid())
+  jobId     String
+  resumeId  String
+  score     Float   // Stores ranking score
+  createdAt DateTime @default(now())
+
+  JobDescription JobDescription @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  Resume         Resume         @relation(fields: [resumeId], references: [id], onDelete: Cascade)
 }
