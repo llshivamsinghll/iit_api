@@ -41,12 +41,14 @@ model JobDescription {
 }
 
 model Leaderboard {
-  id        String   @id @default(uuid())
-  jobId     String
-  resumeId  String
-  score     Float   // Stores ranking score
-  createdAt DateTime @default(now())
-
+  id           String   @id @default(uuid())
+  jobId        String
+  resumeId     String
+  candidateName String  // Added field
+  candidateEmail String // Added field
+  score        Float    // Stores ranking score
+  createdAt    DateTime @default(now())
+  
   JobDescription JobDescription @relation(fields: [jobId], references: [id], onDelete: Cascade)
   Resume         Resume         @relation(fields: [resumeId], references: [id], onDelete: Cascade)
 }

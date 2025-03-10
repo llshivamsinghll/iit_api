@@ -60,5 +60,30 @@ exports.getResumeById = async (req, res) => {
     }
 };
 
+
+exports.fetchLeaderboardData = (jobId) => {
+    try {
+        // Query parameters - optional filter by jobId
+        const whereClause = jobId ? { where: { jobId } } : {};
+
+        // Fetch data from Leaderboard table with specific fields
+        const leaderboardData =prisma.leaderboard.findMany({
+            ...whereClause,
+            select: {
+                candidateName: true,
+                candidateEmail: true,
+                score: true
+            },
+            orderBy: {
+                score: 'desc' // Sort by score in descending order
+            }
+        });
+
+        return leaderboardData;
+    } catch (error) {
+        console.error("Error fetching leaderboard data:", error);
+        throw error;
+    }
+};
 // Register routes in Express
 

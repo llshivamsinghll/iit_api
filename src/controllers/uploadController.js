@@ -1,52 +1,132 @@
-const prisma = require("../config/db"); // ✅ Import Prisma client
-const axios = require("axios");
-const FormData = require("form-data");
-const fs = require("fs");
+// const prisma = require("../config/db");
+
+const fs = require('fs');
+const axios = require('axios');
+const FormData = require('form-data');
+const { PrismaClient } = require('@prisma/client');
+
+const prisma = new PrismaClient();
 exports.uploadResume = async (req, res) => {
     try {
         if (!req.file) {
             return res.status(400).json({ error: "No file uploaded" });
         }
-
+        
         const fileStream = fs.createReadStream(req.file.path);
         const formData = new FormData();
         formData.append("resume_file", fileStream, req.file.originalname);
-
+        
         // Send request to FastAPI
         const response = await axios.post(
             "https://3d37f9c1-2295-4b9e-8f45-a2a118e7be19-00-27r26q9d5zekl.pike.replit.dev/parse/resume",
             formData,
             { headers: { ...formData.getHeaders() } }
         );
-
+        
         // Safe file deletion
         try { fs.unlinkSync(req.file.path); } catch (err) {
             console.warn("Failed to delete uploaded file:", err.message);
         }
-
-        // ✅ Transform API response to match Prisma schema
+        
+        // Transform API response to match Prisma schema
         const parsedData = response.data;
         const resumeData = {
             name: parsedData.name || "Unknown",
             email: parsedData.email || "",
             phone: parsedData.phone || "",
-            technicalSkills: parsedData.technical_skills || [], // Convert to camelCase
+            technicalSkills: parsedData.technical_skills || [],
             softSkills: parsedData.soft_skills || [],
-            experience: parsedData.experience ? parsedData.experience.job_roles.map(role => 
+            experience: parsedData.experience ? parsedData.experience.job_roles.map(role =>
                 `${role.title} at ${role.company} (${role.duration})`
             ) : [],
             education: parsedData.education ? parsedData.education.degrees : [],
-            projects: parsedData.projects ? parsedData.projects.map(proj => 
+            projects: parsedData.projects ? parsedData.projects.map(proj =>
                 `${proj.name} - ${proj.description}`
             ) : []
         };
-
-        // Save transformed resume data to DB ✅
+        
+        // Save transformed resume data to DB
         const savedResume = await prisma.resume.create({
             data: resumeData,
         });
-
-        res.status(201).json(savedResume);
+        
+        try {
+            // Try using GET instead of POST for the matching API
+            const matchResponse = await axios.get(
+                `http://127.0.0.1:5000/api/matches`,
+                {
+                    params: {
+                        resumeId: savedResume.id,
+                        skills: resumeData.technicalSkills.join(','),
+                        experience: resumeData.experience.join(','),
+                        projects: resumeData.projects.join(','),
+                        education: resumeData.education.join(',')
+                    }
+                }
+            );
+            
+            if (matchResponse.data.success && matchResponse.data.matches) {
+                // Find the best match (highest score)
+                let bestMatch = null;
+                let bestMatchJob = null;
+                
+                // Find the best matching job
+                for (const match of matchResponse.data.matches) {
+                    const jobDescription = await prisma.jobDescription.findFirst({
+                        where: {
+                            requiredSkills: {
+                                hasSome: match.required_skills
+                            }
+                        }
+                    });
+                    
+                    if (jobDescription && (!bestMatch || match.total_score > bestMatch.total_score)) {
+                        bestMatch = match;
+                        bestMatchJob = jobDescription;
+                    }
+                }
+                
+                if (bestMatch && bestMatchJob) {
+                    // Create only one leaderboard entry for the best match
+                    await prisma.leaderboard.create({
+                        data: {
+                            jobId: bestMatchJob.id,
+                            resumeId: savedResume.id,
+                            candidateName: resumeData.name,
+                            candidateEmail: resumeData.email,
+                            score: bestMatch.total_score
+                        }
+                    });
+                    
+                    // Return success with resume and match information
+                    res.status(201).json({
+                        resume: savedResume,
+                        matches: 1,
+                        message: `Resume uploaded and matched with the best job opportunity`
+                    });
+                } else {
+                    // If no valid match found
+                    res.status(201).json({
+                        resume: savedResume,
+                        message: "Resume uploaded successfully, but no valid job matches found"
+                    });
+                }
+            } else {
+                // If matching response is invalid, still return success for the resume upload
+                res.status(201).json({
+                    resume: savedResume,
+                    message: "Resume uploaded successfully, but matching data was invalid"
+                });
+            }
+        } catch (matchError) {
+            console.error("Error with matching API:", matchError.message);
+            
+            // If matching API fails, still return success for the resume upload
+            res.status(201).json({
+                resume: savedResume,
+                message: "Resume uploaded successfully. Matching API unavailable."
+            });
+        }
     } catch (error) {
         console.error("Error processing resume:", error.message);
         res.status(500).json({ error: "Internal server error", details: error.message });
