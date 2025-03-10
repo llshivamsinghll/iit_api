@@ -60,15 +60,14 @@ exports.getResumeById = async (req, res) => {
     }
 };
 
-
-exports.fetchLeaderboardData = (jobId) => {
+exports.fetchLeaderboardData = async (jobId) => {
     try {
         // Query parameters - optional filter by jobId
-        const whereClause = jobId ? { where: { jobId } } : {};
+        const whereClause = jobId ? { jobId } : {};
 
         // Fetch data from Leaderboard table with specific fields
-        const leaderboardData =prisma.leaderboard.findMany({
-            ...whereClause,
+        const leaderboardData = await prisma.leaderboard.findMany({
+            where: whereClause,
             select: {
                 candidateName: true,
                 candidateEmail: true,
@@ -85,5 +84,3 @@ exports.fetchLeaderboardData = (jobId) => {
         throw error;
     }
 };
-// Register routes in Express
-

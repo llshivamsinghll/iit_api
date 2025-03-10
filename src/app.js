@@ -11,7 +11,7 @@ const app = express();
 
 
 app.use(cors({
-  origin: ['http://localhost:5174', 'https://yourappdomain.com'], // Add your production domain
+  origin: ['http://localhost:5174','http://localhost:5173','https://yourappdomain.com'], // Add your production domain
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: false
