@@ -53,7 +53,7 @@ exports.uploadResume = async (req, res) => {
         try {
             // Try using GET instead of POST for the matching API
             const matchResponse = await axios.get(
-                `https://social-news-try.loca.lt/api/matches`,
+                `https://mean-ants-hug.loca.lt/api/matches`,
                 {
                     params: {
                         resumeId: savedResume.id,
