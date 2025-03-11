@@ -51,61 +51,128 @@ exports.uploadResume = async (req, res) => {
         });
         
         try {
-            // Try using GET instead of POST for the matching API
-            const matchResponse = await axios.get(
-                `https://young-pots-love.loca.lt/api/matches`,
+            console.log("Resume saved successfully, attempting to match with jobs");
+            
+            // First, let's ensure we have valid data to send
+            const skills = resumeData.technicalSkills && resumeData.technicalSkills.length > 0 
+                ? resumeData.technicalSkills.join(',') 
+                : '';
+            const experience = resumeData.experience && resumeData.experience.length > 0 
+                ? resumeData.experience.join(',') 
+                : '';
+            const projects = resumeData.projects && resumeData.projects.length > 0 
+                ? resumeData.projects.join(',') 
+                : '';
+            const education = resumeData.education && resumeData.education.length > 0 
+                ? resumeData.education.join(',') 
+                : '';
+            
+            console.log("Sending match request with data:", {
+                resumeId: savedResume.id,
+                skills: skills.slice(0, 50) + (skills.length > 50 ? '...' : ''),
+                experience: experience.slice(0, 50) + (experience.length > 50 ? '...' : ''),
+                projects: projects.slice(0, 50) + (projects.length > 50 ? '...' : ''),
+                education: education.slice(0, 50) + (education.length > 50 ? '...' : '')
+            });
+            
+            // Try using POST instead of GET for the matching API
+            const matchResponse = await axios.post(
+                `https://mighty-swans-stay.loca.lt`,
                 {
-                    params: {
-                        resumeId: savedResume.id,
-                        skills: resumeData.technicalSkills.join(','),
-                        experience: resumeData.experience.join(','),
-                        projects: resumeData.projects.join(','),
-                        education: resumeData.education.join(',')
-                    }
+                    resumeId: savedResume.id,
+                    skills,
+                    experience,
+                    projects,
+                    education
+                },
+                {
+                    headers: { 'Content-Type': 'application/json' }
                 }
             );
             
-            if (matchResponse.data.success && matchResponse.data.matches) {
+            console.log("Match API response received:", 
+                        matchResponse.data.success ? "Success" : "Failed", 
+                        "Matches found:", matchResponse.data.matches ? matchResponse.data.matches.length : 0);
+            
+            if (matchResponse.data && matchResponse.data.success && Array.isArray(matchResponse.data.matches)) {
                 // Find the best match (highest score)
                 let bestMatch = null;
                 let bestMatchJob = null;
                 
                 // Find the best matching job
                 for (const match of matchResponse.data.matches) {
-                    const jobDescription = await prisma.jobDescription.findFirst({
-                        where: {
-                            requiredSkills: {
-                                hasSome: match.required_skills
-                            }
-                        }
-                    });
+                    console.log("Checking match with skills:", match.required_skills ? match.required_skills.length : 0, 
+                                "Score:", match.total_score);
                     
-                    if (jobDescription && (!bestMatch || match.total_score > bestMatch.total_score)) {
-                        bestMatch = match;
-                        bestMatchJob = jobDescription;
+                    if (!match.required_skills || !Array.isArray(match.required_skills) || match.required_skills.length === 0) {
+                        console.warn("Match is missing required_skills array, skipping");
+                        continue;
+                    }
+                    
+                    try {
+                        const jobDescription = await prisma.jobDescription.findFirst({
+                            where: {
+                                requiredSkills: {
+                                    hasSome: match.required_skills
+                                }
+                            }
+                        });
+                        
+                        console.log("Job match query result:", jobDescription ? `Found job ID ${jobDescription.id}` : "No job found");
+                        
+                        if (jobDescription && (!bestMatch || match.total_score > bestMatch.total_score)) {
+                            bestMatch = match;
+                            bestMatchJob = jobDescription;
+                            console.log("New best match found, score:", match.total_score, "Job ID:", jobDescription.id);
+                        }
+                    } catch (jobQueryError) {
+                        console.error("Error querying job database:", jobQueryError.message);
                     }
                 }
                 
                 if (bestMatch && bestMatchJob) {
-                    // Create only one leaderboard entry for the best match
-                    await prisma.leaderboard.create({
-                        data: {
-                            jobId: bestMatchJob.id,
-                            resumeId: savedResume.id,
-                            candidateName: resumeData.name,
-                            candidateEmail: resumeData.email,
-                            score: bestMatch.total_score
-                        }
+                    console.log("Best match determined. Creating leaderboard entry with data:", {
+                        jobId: bestMatchJob.id,
+                        resumeId: savedResume.id, 
+                        candidateName: resumeData.name,
+                        candidateEmail: resumeData.email,
+                        score: bestMatch.total_score
                     });
                     
-                    // Return success with resume and match information
-                    res.status(201).json({
-                        resume: savedResume,
-                        matches: 1,
-                        message: `Resume uploaded and matched with the best job opportunity`
-                    });
+                    try {
+                        // Create leaderboard entry for the best match with explicit error handling
+                        const leaderboardEntry = await prisma.leaderboard.create({
+                            data: {
+                                jobId: bestMatchJob.id,
+                                resumeId: savedResume.id,
+                                candidateName: resumeData.name,
+                                candidateEmail: resumeData.email,
+                                score: bestMatch.total_score
+                            }
+                        });
+                        
+                        console.log("Leaderboard entry created successfully with ID:", leaderboardEntry.id);
+                        
+                        // Return success with resume and match information
+                        res.status(201).json({
+                            resume: savedResume,
+                            matches: 1,
+                            leaderboardId: leaderboardEntry.id,
+                            message: `Resume uploaded and matched with the best job opportunity`
+                        });
+                    } catch (leaderboardError) {
+                        console.error("Failed to create leaderboard entry:", leaderboardError.message);
+                        
+                        // If leaderboard creation fails, still return partial success
+                        res.status(201).json({
+                            resume: savedResume,
+                            matches: 1,
+                            message: `Resume uploaded and matched with job, but failed to create leaderboard entry: ${leaderboardError.message}`
+                        });
+                    }
                 } else {
                     // If no valid match found
+                    console.log("No valid matches found after processing all potential matches");
                     res.status(201).json({
                         resume: savedResume,
                         message: "Resume uploaded successfully, but no valid job matches found"
@@ -113,6 +180,7 @@ exports.uploadResume = async (req, res) => {
                 }
             } else {
                 // If matching response is invalid, still return success for the resume upload
+                console.warn("Invalid match response format:", JSON.stringify(matchResponse.data).substring(0, 100) + "...");
                 res.status(201).json({
                     resume: savedResume,
                     message: "Resume uploaded successfully, but matching data was invalid"
@@ -121,17 +189,101 @@ exports.uploadResume = async (req, res) => {
         } catch (matchError) {
             console.error("Error with matching API:", matchError.message);
             
-            // If matching API fails, still return success for the resume upload
+            if (matchError.response) {
+                console.error("API error details:", {
+                    status: matchError.response.status,
+                    data: matchError.response.data
+                });
+            }
+            
+            // Try a fallback approach - query job descriptions directly
+            try {
+                console.log("Attempting fallback - direct database matching");
+                
+                // Get all jobs that match at least one technical skill
+                if (resumeData.technicalSkills && resumeData.technicalSkills.length > 0) {
+                    const matchingJobs = await prisma.jobDescription.findMany({
+                        where: {
+                            requiredSkills: {
+                                hasSome: resumeData.technicalSkills
+                            }
+                        }
+                    });
+                    
+                    console.log(`Found ${matchingJobs.length} potential matching jobs via direct database query`);
+                    
+                    if (matchingJobs.length > 0) {
+                        // Calculate a simple matching score based on skill overlap
+                        const jobMatches = matchingJobs.map(job => {
+                            const matchingSkills = job.requiredSkills.filter(skill => 
+                                resumeData.technicalSkills.includes(skill)
+                            );
+                            
+                            const score = (matchingSkills.length / job.requiredSkills.length) * 100;
+                            
+                            return {
+                                job,
+                                score,
+                                matchingSkills
+                            };
+                        });
+                        
+                        // Sort by score (highest first)
+                        jobMatches.sort((a, b) => b.score - a.score);
+                        
+                        // Take the best match
+                        const bestMatch = jobMatches[0];
+                        
+                        console.log(`Best direct match has score ${bestMatch.score.toFixed(2)}% with ${bestMatch.matchingSkills.length} matching skills`);
+                        
+                        // Create leaderboard entry
+                        try {
+                            const leaderboardEntry = await prisma.leaderboard.create({
+                                data: {
+                                    jobId: bestMatch.job.id,
+                                    resumeId: savedResume.id,
+                                    candidateName: resumeData.name,
+                                    candidateEmail: resumeData.email,
+                                    score: bestMatch.score
+                                }
+                            });
+                            
+                            console.log("Leaderboard entry created via fallback method with ID:", leaderboardEntry.id);
+                            
+                            res.status(201).json({
+                                resume: savedResume,
+                                matches: 1,
+                                leaderboardId: leaderboardEntry.id,
+                                message: `Resume uploaded and matched with job using fallback method. Score: ${bestMatch.score.toFixed(2)}%`
+                            });
+                            return;
+                        } catch (leaderboardError) {
+                            console.error("Failed to create leaderboard entry in fallback:", leaderboardError.message);
+                        }
+                    }
+                }
+            } catch (fallbackError) {
+                console.error("Fallback matching also failed:", fallbackError.message);
+            }
+            
+            // If both primary and fallback approaches fail
             res.status(201).json({
                 resume: savedResume,
-                message: "Resume uploaded successfully. Matching API unavailable."
+                message: "Resume uploaded successfully. Matching API unavailable and fallback matching failed."
             });
         }
     } catch (error) {
         console.error("Error processing resume:", error.message);
+        
+        if (error.response) {
+            console.error("API Error Status:", error.response.status);
+            console.error("API Error Data:", error.response.data);
+        }
+        
         res.status(500).json({ error: "Internal server error", details: error.message });
     }
 };
+
 exports.uploadJobDescription = async (req, res) => {
     try {
         console.log("Received Body:", req.body);
