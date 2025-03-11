@@ -1,33 +1,34 @@
-// const prisma = require("../config/db");
-
 const fs = require('fs');
 const axios = require('axios');
 const FormData = require('form-data');
 const { PrismaClient } = require('@prisma/client');
 
 const prisma = new PrismaClient();
+
 exports.uploadResume = async (req, res) => {
     try {
         if (!req.file) {
             return res.status(400).json({ error: "No file uploaded" });
         }
-        
+
         const fileStream = fs.createReadStream(req.file.path);
         const formData = new FormData();
         formData.append("resume_file", fileStream, req.file.originalname);
-        
+
         // Send request to FastAPI
         const response = await axios.post(
             "https://41cd7f41-176f-482b-a0fb-55e00ff12626-00-v6o4c7kvy4fh.sisko.replit.dev/parse/resume",
             formData,
             { headers: { ...formData.getHeaders() } }
         );
-        
+
         // Safe file deletion
-        try { fs.unlinkSync(req.file.path); } catch (err) {
+        try {
+            fs.unlinkSync(req.file.path);
+        } catch (err) {
             console.warn("Failed to delete uploaded file:", err.message);
         }
-        
+
         // Transform API response to match Prisma schema
         const parsedData = response.data;
         const resumeData = {
@@ -44,12 +45,12 @@ exports.uploadResume = async (req, res) => {
                 `${proj.name} - ${proj.description}`
             ) : []
         };
-        
+
         // Save transformed resume data to DB
         const savedResume = await prisma.resume.create({
             data: resumeData,
         });
-        
+
         try {
             // Try using GET instead of POST for the matching API
             const matchResponse = await axios.get(
@@ -64,12 +65,12 @@ exports.uploadResume = async (req, res) => {
                     }
                 }
             );
-            
+
             if (matchResponse.data.success && matchResponse.data.matches) {
                 // Find the best match (highest score)
                 let bestMatch = null;
                 let bestMatchJob = null;
-                
+
                 // Find the best matching job
                 for (const match of matchResponse.data.matches) {
                     const jobDescription = await prisma.jobDescription.findFirst({
@@ -79,31 +80,42 @@ exports.uploadResume = async (req, res) => {
                             }
                         }
                     });
-                    
+
                     if (jobDescription && (!bestMatch || match.total_score > bestMatch.total_score)) {
                         bestMatch = match;
                         bestMatchJob = jobDescription;
                     }
                 }
-                
+
+                // If a valid match is found, create the leaderboard entry
                 if (bestMatch && bestMatchJob) {
-                    // Create only one leaderboard entry for the best match
-                    await prisma.leaderboard.create({
-                        data: {
-                            jobId: bestMatchJob.id,
-                            resumeId: savedResume.id,
-                            candidateName: resumeData.name,
-                            candidateEmail: resumeData.email,
-                            score: bestMatch.total_score
-                        }
-                    });
-                    
-                    // Return success with resume and match information
-                    res.status(201).json({
-                        resume: savedResume,
-                        matches: 1,
-                        message: `Resume uploaded and matched with the best job opportunity`
-                    });
+                    console.log("Best Match Job:", bestMatchJob);
+                    console.log("Best Match:", bestMatch);
+
+                    try {
+                        // Create leaderboard entry inside a transaction
+                        await prisma.leaderboard.create({
+                            data: {
+                                jobId: bestMatchJob.id,
+                                resumeId: savedResume.id,
+                                candidateName: resumeData.name,
+                                candidateEmail: resumeData.email,
+                                score: bestMatch.total_score
+                            }
+                        });
+
+                        res.status(201).json({
+                            resume: savedResume,
+                            matches: 1,
+                            message: `Resume uploaded and matched with the best job opportunity`
+                        });
+                    } catch (leaderboardError) {
+                        console.error("Error saving to leaderboard:", leaderboardError);
+                        res.status(500).json({
+                            resume: savedResume,
+                            message: "Resume uploaded successfully, but failed to save leaderboard entry"
+                        });
+                    }
                 } else {
                     // If no valid match found
                     res.status(201).json({
@@ -120,7 +132,7 @@ exports.uploadResume = async (req, res) => {
             }
         } catch (matchError) {
             console.error("Error with matching API:", matchError.message);
-            
+
             // If matching API fails, still return success for the resume upload
             res.status(201).json({
                 resume: savedResume,
@@ -132,6 +144,7 @@ exports.uploadResume = async (req, res) => {
         res.status(500).json({ error: "Internal server error", details: error.message });
     }
 };
+
 exports.uploadJobDescription = async (req, res) => {
     try {
         console.log("Received Body:", req.body);
@@ -209,7 +222,7 @@ exports.uploadJobDescription = async (req, res) => {
         });
 
         console.log("Successfully saved to database with ID:", savedJob.id);
-        
+
         res.status(201).json(savedJob);
     } catch (error) {
         console.error("Error processing job description:", error.message);
