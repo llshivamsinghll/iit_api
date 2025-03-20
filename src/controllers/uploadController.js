@@ -77,7 +77,7 @@ exports.uploadResume = async (req, res) => {
             
             // Try using POST instead of GET for the matching API
             const matchResponse = await axios.post(
-                `https://floppy-plums-open.loca.lt`,
+                `http://ec2-65-2-75-152.ap-south-1.compute.amazonaws.com:5000`,
                 {
                     resumeId: savedResume.id,
                     skills,
@@ -297,7 +297,7 @@ exports.uploadJobDescription = async (req, res) => {
         console.log("Sending to FastAPI with job description length:", job_description.length);
 
         const response = await axios.post(
-            "https://41cd7f41-176f-482b-a0fb-55e00ff12626-00-v6o4c7kvy4fh.sisko.replit.dev/parse/job-description",
+            "https://replit-iit-tato.onrender.com/parse/job-description",
             new URLSearchParams({ job_description }).toString(),
             { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
         );
