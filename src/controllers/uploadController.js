@@ -18,7 +18,7 @@ exports.uploadResume = async (req, res) => {
         
         // Send request to FastAPI
         const response = await axios.post(
-            "https://41cd7f41-176f-482b-a0fb-55e00ff12626-00-v6o4c7kvy4fh.sisko.replit.dev/parse/resume",
+            "https://replit-iit-tato.onrender.com/health/parse/resume",
             formData,
             { headers: { ...formData.getHeaders() } }
         );
