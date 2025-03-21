@@ -38,6 +38,8 @@ CREATE TABLE "Leaderboard" (
     "id" TEXT NOT NULL,
     "jobId" TEXT NOT NULL,
     "resumeId" TEXT NOT NULL,
+    "candidateName" TEXT NOT NULL,
+    "candidateEmail" TEXT NOT NULL,
     "score" DOUBLE PRECISION NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
