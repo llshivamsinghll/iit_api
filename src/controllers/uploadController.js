@@ -18,7 +18,7 @@ exports.uploadResume = async (req, res) => {
         
         // Send request to FastAPI
         const response = await axios.post(
-            "https://replit-ats.onrender.com/health/parse/resume",
+            "https://3d37f9c1-2295-4b9e-8f45-a2a118e7be19-00-27r26q9d5zekl.pike.replit.dev/health/parse/resume",
             formData,
             { headers: { ...formData.getHeaders() } }
         );
@@ -297,7 +297,7 @@ exports.uploadJobDescription = async (req, res) => {
         console.log("Sending to FastAPI with job description length:", job_description.length);
 
         const response = await axios.post(
-            "https://replit-ats.onrender.com/parse/job-description",
+            "https://3d37f9c1-2295-4b9e-8f45-a2a118e7be19-00-27r26q9d5zekl.pike.replit.dev/parse/job-description",
             new URLSearchParams({ job_description }).toString(),
             { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
         );
