@@ -77,7 +77,7 @@ exports.uploadResume = async (req, res) => {
             
             // Try using POST instead of GET for the matching API
             const matchResponse = await axios.post(
-                `https://f94f-2401-4900-7ce2-40d3-7d12-f274-2e4f-5930.ngrok-free.app/`,
+                `https://03ad-2401-4900-7b3f-f001-41b5-ffc5-8fe6-8cca.ngrok-free.app `,
                 {
                     resumeId: savedResume.id,
                     skills,
