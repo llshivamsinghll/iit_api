@@ -18,7 +18,7 @@ exports.uploadResume = async (req, res) => {
         
         // Send request to FastAPI
         const response = await axios.post(
-            "https://41cd7f41-176f-482b-a0fb-55e00ff12626-00-v6o4c7kvy4fh.sisko.repl.co/parse/resume",
+            "https://3d37f9c1-2295-4b9e-8f45-a2a118e7be19-00-27r26q9d5zekl.pike.replit.dev/parse/resume",
             formData,
             { headers: { ...formData.getHeaders() } }
         );
@@ -297,7 +297,7 @@ exports.uploadJobDescription = async (req, res) => {
         console.log("Sending to FastAPI with job description length:", job_description.length);
 
         const response = await axios.post(
-            "https://41cd7f41-176f-482b-a0fb-55e00ff12626-00-v6o4c7kvy4fh.sisko.repl.co/parse/job-description",
+            "https://3d37f9c1-2295-4b9e-8f45-a2a118e7be19-00-27r26q9d5zekl.pike.replit.dev/parse/job-description",
             new URLSearchParams({ job_description }).toString(),
             { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
         );
